@@ -8,28 +8,56 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # runs-on is chosen from the matrix per-job (parallel matrix jobs)
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # Define a matrix with 3 variants
-        node-version: [18, 20, 22]
+        # Define exactly 3 variants (multi-platform + node versions)
+        include:
+          - os: ubuntu-latest
+            node-version: 18
+            variant: ubuntu-node18
+          - os: windows-latest
+            node-version: 16
+            variant: windows-node16
+          - os: macos-latest
+            node-version: 14
+            variant: macos-node14
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # This step includes the required dynamic identifier
-      - name: Build for Node ${{ matrix.node-version }} (matrix-6965e29)
-        run: |
-          echo "Simulating build for Node.js version ${{ matrix.node-version }}"
-          echo "This is the build output." > build_output.txt
-          echo "Identifier: matrix-c064f21" >> build_output.txt
+      # Ensure Node.js is available on all platforms for artifact generation
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
 
-      # This step uploads an artifact with the required dynamic prefix
+      # This step must contain the identifier "matrix-6965e29"
+      - name: matrix-6965e29
+        run: |
+          echo "Matrix job: ${{ matrix.variant }} on ${{ matrix.os }} using Node ${{ matrix.node-version }}"
+      
+      - name: Generate build artifact
+        run: |
+          # create a non-empty artifact containing identifying info
+          echo "Identifier: matrix-6965e29" > build_output.txt
+          echo "Variant: ${{ matrix.variant }}" >> build_output.txt
+          echo "OS: ${{ matrix.os }}" >> build_output.txt
+          echo "Node requested: ${{ matrix.node-version }}" >> build_output.txt
+
+          # Append Node runtime info and ISO timestamp (cross-platform via node)
+          node -e "const fs=require('fs'); fs.appendFileSync('build_output.txt', 'Node runtime: '+process.version+'\\n'); fs.appendFileSync('build_output.txt', 'UTC: '+new Date().toISOString()+'\\n');"
+
+          # Print file contents (helpful for debugging in job logs)
+          echo "=== build_output.txt ==="
+          cat build_output.txt || type build_output.txt || true
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          # Use the prefix and include the matrix variant in the name
-          name: build-c064f21-node-${{ matrix.node-version }}
+          # artifact name must start with the required prefix
+          name: build-6965e29-${{ matrix.variant }}
           path: build_output.txt
           retention-days: 7
